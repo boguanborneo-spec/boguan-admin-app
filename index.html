@@ -35,8 +35,10 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 .produk-slot-header span{font-size:12px;font-weight:700;color:#1E8449;text-transform:uppercase;letter-spacing:0.5px}
 .produk-slot-header button{background:none;border:none;color:#bbb;cursor:pointer;font-size:18px;padding:2px 4px;border-radius:6px}
 .produk-slot-header button:active{background:#fee}
-.produk-row{display:grid;grid-template-columns:1fr 55px 65px;gap:6px}
-.produk-row select,.produk-row input{font-size:12px;padding:8px 8px;border:1px solid #ddd;border-radius:8px;background:#fff}
+.produk-row{display:flex;flex-direction:column;gap:6px}
+.produk-row select{width:100%;font-size:13px;padding:9px 10px;border:1px solid #ddd;border-radius:8px;background:#fff}
+.produk-row-nums{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.produk-row input{font-size:13px;padding:9px 10px;border:1px solid #ddd;border-radius:8px;background:#fff;width:100%}
 .produk-row select{padding-right:4px;background-image:none}
 .col-labels{display:flex;justify-content:space-between;font-size:10px;color:#aaa;margin-top:4px;padding:0 2px}
 .add-produk{width:100%;padding:11px;border:1.5px dashed #ccc;border-radius:10px;background:none;color:#1E8449;font-size:13px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;margin-bottom:4px;transition:all 0.15s}
@@ -254,11 +256,18 @@ function addSlot() {
       <button onclick="removeSlot(${id})"><i class="ti ti-x"></i></button>
     </div>
     <div class="produk-row">
-      <select id="prod-${id}" onchange="calcTotal()"><option value="">-- Pilih --</option>${buildOpts()}</select>
-      <input type="number" id="qty-${id}" placeholder="Qty" min="0" oninput="calcTotal()">
-      <input type="number" id="disc-${id}" placeholder="Disc" min="0" step="0.50" oninput="calcTotal()">
-    </div>
-    <div class="col-labels"><span>Nama Produk</span><span>Qty &nbsp; Disc(RM)</span></div>`;
+      <select id="prod-${id}" onchange="calcTotal()"><option value="">-- Pilih Produk --</option>${buildOpts()}</select>
+      <div class="produk-row-nums">
+        <div>
+          <label style="font-size:11px;color:#888;display:block;margin-bottom:3px">Qty</label>
+          <input type="number" id="qty-${id}" placeholder="0" min="0" oninput="calcTotal()" style="text-align:center">
+        </div>
+        <div>
+          <label style="font-size:11px;color:#888;display:block;margin-bottom:3px">Disc (RM)</label>
+          <input type="number" id="disc-${id}" placeholder="0.00" min="0" step="0.50" oninput="calcTotal()" style="text-align:center">
+        </div>
+      </div>
+    </div>`;
   document.getElementById('produkSlots').appendChild(div);
   if (slotIds.length >= 10) document.getElementById('addBtn').style.display = 'none';
   calcTotal();
@@ -433,4 +442,3 @@ loadProduk();
 </script>
 </body>
 </html>
-
