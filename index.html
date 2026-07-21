@@ -74,6 +74,21 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 .stok-bal.ok{color:#1E8449}.stok-bal.low{color:#E67E22}.stok-bal.empty{color:#C0392B}
 .stok-sold{font-size:11px;color:#aaa}
 .section-hdr{font-size:17px;font-weight:700;margin-bottom:16px;color:#1a1a1a}
+.modal-overlay{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);z-index:200;display:none;align-items:flex-end}
+.modal-overlay.show{display:flex}
+.modal{background:#fff;border-radius:16px 16px 0 0;width:100%;max-height:85vh;overflow-y:auto;padding:20px 16px 30px}
+.modal-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:4px}
+.modal-title{font-size:17px;font-weight:700}
+.modal-close{background:none;border:none;font-size:24px;color:#aaa;cursor:pointer}
+.modal-sub{font-size:12px;color:#888;margin-bottom:16px}
+.modal-produk{padding:10px 0;border-bottom:1px solid #f0f0f0;display:flex;justify-content:space-between;align-items:center}
+.modal-produk:last-child{border-bottom:none}
+.modal-produk-nama{font-size:13px;font-weight:600}
+.modal-produk-detail{font-size:11px;color:#aaa;margin-top:2px}
+.modal-produk-subtotal{font-size:13px;font-weight:700;color:#1E8449;text-align:right}
+.modal-summary{background:#f8f9fa;border-radius:10px;padding:12px;margin-top:14px}
+.modal-summary-row{display:flex;justify-content:space-between;font-size:13px;padding:4px 0}
+.modal-summary-row.total{font-weight:700;font-size:15px;border-top:1px solid #e0e0e0;margin-top:6px;padding-top:8px;color:#1E8449}
 .toast{position:fixed;bottom:90px;left:50%;transform:translateX(-50%) translateY(10px);background:#1E8449;color:#fff;padding:10px 22px;border-radius:24px;font-size:13px;font-weight:600;z-index:999;opacity:0;transition:all 0.25s;pointer-events:none;white-space:nowrap;box-shadow:0 4px 16px rgba(0,0,0,0.2)}
 .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
 .toast.err{background:#C0392B}
@@ -178,9 +193,19 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
     <div class="section-hdr">Baki Stok</div>
     <div id="stokList"><div class="loading"><i class="ti ti-loader"></i>Memuatkan...</div></div>
   </div>
+<!-- Detail Modal -->
+<div class="modal-overlay" id="detailModal" onclick="closeModal(event)">
+  <div class="modal" id="modalContent">
+    <div class="modal-header">
+      <div class="modal-title" id="modalNama">-</div>
+      <button class="modal-close" onclick="document.getElementById('detailModal').classList.remove('show')">×</button>
+    </div>
+    <div class="modal-sub" id="modalSub"></div>
+    <div id="modalProdukList"></div>
+    <div class="modal-summary" id="modalSummary"></div>
+  </div>
 </div>
-
-<script>
+</div>
 const GAS = "https://script.google.com/macros/s/AKfycbwTytnA2U882PpUgBQj8v4oLWdBlHSmMR9V2aFB-ws5DhHjE94vam36QlW4_WshuwlZ/exec";
 let produkList = [];
 let slotCount = 0;
@@ -365,18 +390,68 @@ function showErr(msg) {
   window.scrollTo(0, 0);
 }
 
+let jualanData = [];
+
+function closeModal(e) {
+  if (e.target === document.getElementById('detailModal')) {
+    document.getElementById('detailModal').classList.remove('show');
+  }
+}
+
+function showDetail(idx) {
+  const j = jualanData[idx];
+  if (!j) return;
+  const bc = (j.paid||'').includes('Paid') ? 'paid' : j.paid==='Partial' ? 'partial' : 'belum';
+  document.getElementById('modalNama').textContent = j.nama || '-';
+  document.getElementById('modalSub').innerHTML = 
+    `${j.tarikh||''} ${j.asalFarm ? '· '+j.asalFarm : ''} ${j.noHp ? '· '+j.noHp : ''}<br>
+     <span class="badge ${bc}" style="margin-top:4px">${j.paid||'-'}</span> 
+     ${j.tunaiOnline ? '<span style="font-size:12px;color:#555"> · '+j.tunaiOnline+'</span>' : ''}
+     ${j.codBy ? '<span style="font-size:12px;color:#555"> · COD: '+j.codBy+'</span>' : ''}`;
+
+  // Produk list
+  const produk = j.produk || [];
+  let produkHTML = '';
+  if (produk.length === 0) {
+    produkHTML = '<div style="color:#aaa;font-size:13px;padding:10px 0">Tiada data produk</div>';
+  } else {
+    produkHTML = produk.map(p => {
+      const harga = produkList.find(pl => pl.nama === p.nama)?.harga || 0;
+      const subtotal = (harga * parseFloat(p.qty||0)) - parseFloat(p.disc||0);
+      return `<div class="modal-produk">
+        <div>
+          <div class="modal-produk-nama">${p.nama}</div>
+          <div class="modal-produk-detail">Qty: ${p.qty} × RM${harga}${parseFloat(p.disc||0) > 0 ? ' − Disc RM'+p.disc : ''}</div>
+        </div>
+        <div class="modal-produk-subtotal">RM ${subtotal.toFixed(2)}</div>
+      </div>`;
+    }).join('');
+  }
+  document.getElementById('modalProdukList').innerHTML = produkHTML;
+
+  // Summary
+  document.getElementById('modalSummary').innerHTML = `
+    ${parseFloat(j.casHantar||0) > 0 ? `<div class="modal-summary-row"><span>CAS Hantar</span><span>RM ${parseFloat(j.casHantar).toFixed(2)}</span></div>` : ''}
+    ${parseFloat(j.extra||0) > 0 ? `<div class="modal-summary-row"><span>Extra</span><span>RM ${parseFloat(j.extra).toFixed(2)}</span></div>` : ''}
+    <div class="modal-summary-row total"><span>TOTAL</span><span>RM ${parseFloat(j.total||0).toFixed(2)}</span></div>
+    ${j.nota ? `<div style="font-size:12px;color:#888;margin-top:8px;font-style:italic">${j.nota}</div>` : ''}`;
+
+  document.getElementById('detailModal').classList.add('show');
+}
+
 async function loadJualan() {
   const el = document.getElementById('jualanList');
   el.innerHTML = '<div class="loading"><i class="ti ti-loader"></i>Memuatkan...</div>';
   try {
     const data = await gasCall('getJualan');
     if (!data?.length) { el.innerHTML = '<div class="loading">Tiada data jualan.</div>'; return; }
-    el.innerHTML = '<div class="card">' + [...data].reverse().slice(0,50).map(j => {
+    jualanData = [...data].reverse().slice(0, 50);
+    el.innerHTML = '<div class="card">' + jualanData.map((j, idx) => {
       const bc = (j.paid||'').includes('Paid') ? 'paid' : j.paid==='Partial' ? 'partial' : 'belum';
-      return `<div class="jualan-item">
+      return `<div class="jualan-item" onclick="showDetail(${idx})" style="cursor:pointer">
         <div class="jualan-top">
           <div>
-            <div class="jualan-nama">${j.nama||'-'}</div>
+            <div class="jualan-nama" style="display:flex;align-items:center;gap:6px">${j.nama||'-'} <i class="ti ti-chevron-right" style="font-size:12px;color:#ccc"></i></div>
             <div class="jualan-sub">${j.tarikh||''} ${j.tunaiOnline ? '· '+j.tunaiOnline : ''} ${j.asalFarm ? '· '+j.asalFarm : ''}</div>
             ${j.paid ? `<span class="badge ${bc}">${j.paid}</span>` : ''}
           </div>
