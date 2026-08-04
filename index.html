@@ -178,13 +178,25 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 
   <!-- JUALAN -->
   <div id="page-jualan" class="page">
-    <div class="section-hdr">Senarai Jualan</div>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+      <div class="section-hdr" style="margin-bottom:0">Senarai Jualan</div>
+      <select id="monthSelector" onchange="loadJualan()" style="padding:7px 12px;border:1px solid #ddd;border-radius:8px;font-size:13px;font-weight:600;color:#1E8449;background:#f0faf4;border-color:#b7e4c7">
+        <option value="2026-08" selected>Ogos 2026</option>
+        <option value="2026-07">Julai 2026</option>
+      </select>
+    </div>
     <div id="jualanList"><div class="loading"><i class="ti ti-loader"></i>Memuatkan...</div></div>
   </div>
 
   <!-- RINGKASAN -->
   <div id="page-ringkasan" class="page">
-    <div class="section-hdr">Ringkasan Jualan</div>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+      <div class="section-hdr" style="margin-bottom:0">Ringkasan Jualan</div>
+      <select id="monthSelectorRingkasan" onchange="loadRingkasan()" style="padding:7px 12px;border:1px solid #ddd;border-radius:8px;font-size:13px;font-weight:600;color:#1E8449;background:#f0faf4;border-color:#b7e4c7">
+        <option value="2026-08" selected>Ogos 2026</option>
+        <option value="2026-07">Julai 2026</option>
+      </select>
+    </div>
     <div id="ringkasanContent"><div class="loading"><i class="ti ti-loader"></i>Memuatkan...</div></div>
   </div>
 
@@ -229,8 +241,10 @@ function showToast(msg, err) {
   setTimeout(() => t.className = 'toast', 3000);
 }
 
-async function gasCall(action, data) {
-  const url = GAS + '?action=' + action + (data ? '&data=' + encodeURIComponent(JSON.stringify(data)) : '');
+async function gasCall(action, data, month) {
+  const url = GAS + '?action=' + action 
+    + (month ? '&month=' + month : '')
+    + (data ? '&data=' + encodeURIComponent(JSON.stringify(data)) : '');
   try {
     const res = await fetch(url, { method: 'GET', mode: 'cors' });
     if (!res.ok) throw new Error('HTTP ' + res.status);
@@ -346,6 +360,8 @@ async function submitJualan() {
   btn.innerHTML = '<i class="ti ti-loader" style="animation:spin 1s linear infinite"></i> Menghantar...';
 
   try {
+    const now = new Date();
+    const monthKey = now.getFullYear() + '-' + (now.getMonth()+1).toString().padStart(2,'0');
     const r = await gasCall('tambahJualan', {
       tarikh, nama,
       noHp: document.getElementById('noHp').value,
@@ -357,7 +373,7 @@ async function submitJualan() {
       paid: document.getElementById('paid').value,
       codBy: document.getElementById('codBy').value,
       nota: document.getElementById('nota').value
-    });
+    }, monthKey);
     if (r && r.success) {
       alert('✅ Berjaya! Data ' + nama + ' masuk row ' + r.row + ' dalam Google Sheets.');
       showToast('Berjaya disimpan ke Google Sheets!');
@@ -442,9 +458,10 @@ function showDetail(idx) {
 
 async function loadJualan() {
   const el = document.getElementById('jualanList');
+  const monthKey = document.getElementById('monthSelector') ? document.getElementById('monthSelector').value : '2026-08';
   el.innerHTML = '<div class="loading"><i class="ti ti-loader"></i>Memuatkan...</div>';
   try {
-    const data = await gasCall('getJualan');
+    const data = await gasCall('getJualan', null, monthKey);
     if (!data?.length) { el.innerHTML = '<div class="loading">Tiada data jualan.</div>'; return; }
     jualanData = [...data].reverse().slice(0, 50);
     el.innerHTML = '<div class="card">' + jualanData.map((j, idx) => {
@@ -466,28 +483,33 @@ async function loadJualan() {
 
 async function loadRingkasan() {
   const el = document.getElementById('ringkasanContent');
+  const sel = document.getElementById('monthSelectorRingkasan');
+  const monthKey = sel ? sel.value : '2026-08';
   el.innerHTML = '<div class="loading"><i class="ti ti-loader"></i>Memuatkan...</div>';
   try {
-    const d = await gasCall('getRingkasan');
-    el.innerHTML = `
-      <div class="stat-grid">
-        <div class="stat"><div class="lbl">Total Jualan</div><div class="val green">RM ${parseFloat(d.totalSales||0).toLocaleString('ms-MY',{minimumFractionDigits:2,maximumFractionDigits:2})}</div></div>
-        <div class="stat"><div class="lbl">Sudah Bayar</div><div class="val green">RM ${parseFloat(d.paid||0).toFixed(0)}</div></div>
-        <div class="stat"><div class="lbl">Partial</div><div class="val orange">RM ${parseFloat(d.partial||0).toFixed(0)}</div></div>
-        <div class="stat"><div class="lbl">Belum Bayar</div><div class="val red">RM ${parseFloat(d.belumBayar||0).toFixed(0)}</div></div>
-      </div>
-      <div class="card">
-        <div class="card-title">Jenis Pembayaran</div>
-        <div style="display:flex;justify-content:space-between;padding:10px 0;border-bottom:1px solid #f0f0f0">
-          <span style="font-size:14px;display:flex;align-items:center;gap:6px"><i class="ti ti-cash" style="color:#1E8449"></i> Tunai</span>
-          <span style="font-weight:700;font-size:15px">RM ${parseFloat(d.tunai||0).toFixed(2)}</span>
-        </div>
-        <div style="display:flex;justify-content:space-between;padding:10px 0">
-          <span style="font-size:14px;display:flex;align-items:center;gap:6px"><i class="ti ti-device-mobile" style="color:#1A5276"></i> Online</span>
-          <span style="font-weight:700;font-size:15px">RM ${parseFloat(d.online||0).toFixed(2)}</span>
-        </div>
-      </div>`;
-  } catch(e) { el.innerHTML = '<div class="loading">Gagal muatkan ringkasan.</div>'; }
+    const d = await gasCall('getRingkasan', null, monthKey);
+    if (!d || d.error) { el.innerHTML = '<div class="loading">Gagal muatkan ringkasan.</div>'; return; }
+    const totalSales = parseFloat(d.totalSales||0);
+    const tunai = parseFloat(d.tunai||0);
+    const online = parseFloat(d.online||0);
+    const paid = parseFloat(d.paid||0);
+    const partial = parseFloat(d.partial||0);
+    const belumBayar = parseFloat(d.belumBayar||0);
+    el.innerHTML = '<div class="stat-grid">'
+      + '<div class="stat"><div class="lbl">Total Jualan</div><div class="val green">RM ' + totalSales.toFixed(2) + '</div></div>'
+      + '<div class="stat"><div class="lbl">Sudah Bayar</div><div class="val green">RM ' + paid.toFixed(0) + '</div></div>'
+      + '<div class="stat"><div class="lbl">Partial</div><div class="val orange">RM ' + partial.toFixed(0) + '</div></div>'
+      + '<div class="stat"><div class="lbl">Belum Bayar</div><div class="val red">RM ' + belumBayar.toFixed(0) + '</div></div>'
+      + '</div>'
+      + '<div class="card"><div class="card-title">Jenis Pembayaran</div>'
+      + '<div style="display:flex;justify-content:space-between;padding:10px 0;border-bottom:1px solid #f0f0f0">'
+      + '<span style="font-size:14px">Tunai</span>'
+      + '<span style="font-weight:700;font-size:15px">RM ' + tunai.toFixed(2) + '</span></div>'
+      + '<div style="display:flex;justify-content:space-between;padding:10px 0">'
+      + '<span style="font-size:14px">Online</span>'
+      + '<span style="font-weight:700;font-size:15px">RM ' + online.toFixed(2) + '</span></div>'
+      + '</div>';
+  } catch(e) { el.innerHTML = '<div class="loading">Gagal muatkan ringkasan: ' + e.message + '</div>'; }
 }
 
 async function loadStok() {
